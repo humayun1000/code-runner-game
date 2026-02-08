@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Code Runner - Learn Programming</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            color: #fff; 
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            touch-action: manipulation;
+        }
+        #gameContainer { 
+            width: 100vw; 
+            height: 100vh; 
+            position: relative; 
+            background: #0f0f1e; 
+            display: flex;
+            flex-direction: column;
+        }
+        #gameCanvas { 
+            width: 100%; 
+            flex: 1;
+            display: block; 
+            background: linear-gradient(180deg, #0a0a15 0%, #1a1a2e 100%); 
+            touch-action: none;
+        }
+        .overlay { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0, 0, 0, 0.95); 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 100; 
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .hidden { display: none !important; }
+        h1 { 
+            font-size: 2.5em; 
+            margin-bottom: 20px; 
+            color: #00ff88; 
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5); 
+            text-align: center;
+        }
+        .subtitle { 
+            font-size: 1em; 
+            color: #aaa; 
+            margin-bottom: 20px; 
+            text-align: center; 
+        }
+        button { 
+            padding: 18px 50px; 
+            font-size: 1.3em; 
+            font-family: 'Courier New', monospace; 
+            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%); 
+            color: #000; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            margin: 15px; 
+            font-weight: bold; 
+            box-shadow: 0 5px 25px rgba(0, 255, 136, 0.5);
+            touch-action: manipulation;
+            min-height: 60px;
+        }
+        button:active { 
+            transform: scale(0.95); 
+            box-shadow: 0 2px 15px rgba(0, 255, 136, 0.7); 
+        }
+        #hud { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            right: 10px; 
+            display: flex; 
+            justify-content: space-between; 
+            z-index: 50; 
+            pointer-events: none; 
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .hud-item { 
+            background: rgba(0, 0, 0, 0.8); 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            font-size: 1.1em; 
+            font-weight: bold; 
+        }
+        .score { color: #00ff88; }
+        .level { color: #00ccff; }
+        .lives { color: #ff0088; }
+        #instructions { 
+            max-width: 400px; 
+            text-align: left; 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 15px; 
+            border-radius: 12px; 
+            margin: 15px 0; 
+            font-size: 0.9em;
+        }
+        #instructions h2 { 
+            color: #00ccff; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            font-size: 1.2em;
+        }
+        #instructions p { 
+            margin: 8px 0; 
+            line-height: 1.5; 
+        }
+        #instructions .code-example { 
+            background: rgba(0, 255, 136, 0.15); 
+            padding: 6px; 
+            border-radius: 4px; 
+            margin: 4px 0; 
+            color: #00ff88; 
+            font-size: 0.9em;
+        }
+        #gameOver { text-align: center; }
+        #finalScore { 
+            font-size: 2.5em; 
+            color: #00ff88; 
+            margin: 25px 0; 
+            font-weight: bold;
+        }
+        .button-group { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        @keyframes pulse { 
+            0%, 100% { transform: scale(1); } 
+            50% { transform: scale(1.08); } 
+        }
+        .pulse { animation: pulse 2s infinite; }
+        
+        /* Landscape mode adjustments */
+        @media (orientation: landscape) and (max-height: 500px) {
+            h1 { font-size: 1.8em; margin-bottom: 10px; }
+            #instructions { padding: 10px; font-size: 0.8em; max-height: 60vh; overflow-y: auto; }
+            button { padding: 12px 30px; font-size: 1em; margin: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="hud" class="hidden">
+            <div class="hud-item score">Score: <span id="scoreDisplay">0</span></div>
+            <div class="hud-item level">Level: <span id="levelDisplay">1</span></div>
+            <div class="hud-item lives">Lives: <span id="livesDisplay">3</span></div>
+        </div>
+
+        <div id="startScreen" class="overlay">
+            <h1 class="pulse">⚡ CODE RUNNER ⚡</h1>
+            <div class="subtitle">Learn Programming Through Play</div>
+            <div id="instructions">
+                <h2>How to Play</h2>
+                <p><strong>Goal:</strong> Match falling code blocks with correct basket!</p>
+                <p><strong>Controls:</strong> Tap left/right side of screen</p>
+                <p><strong>Categories:</strong></p>
+                <div class="code-example">🟢 Variables: x, y, name</div>
+                <div class="code-example">🔵 Loops: for, while</div>
+                <div class="code-example">🟣 Conditions: if, else</div>
+                <div class="code-example">🟠 Functions: def, return</div>
+                <p><strong>Scoring:</strong> +10 points correct, -1 life wrong</p>
+            </div>
+            <button id="startBtn" class="pulse">START GAME</button>
+        </div>
+
+        <div id="gameOver" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <div id="finalScore">Score: 0</div>
+            <div class="subtitle">Great job learning! 💻</div>
+            <div class="button-group">
+                <button id="restartBtn">PLAY AGAIN</button>
+                <button id="menuBtn">MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🎮 Code Runner Loading...');
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize canvas to fill container
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            console.log('Canvas resized:', canvas.width, 'x', canvas.height);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 100);
+        });
+
+        // Game data
+        const codeBlocks = {
+            variables: ['x', 'y', 'name', 'age', 'count', 'data'],
+            loops: ['for', 'while', 'do', 'loop', 'repeat'],
+            conditions: ['if', 'else', 'elif', 'switch', 'case'],
+            functions: ['def', 'return', 'func', 'void', 'call']
+        };
+        
+        const categories = Object.keys(codeBlocks);
+        const categoryColors = { 
+            variables: '#00ff88', 
+            loops: '#00ccff', 
+            conditions: '#ff00ff', 
+            functions: '#ffaa00' 
+        };
+
+        let gameState = {
+            running: false,
+            score: 0,
+            level: 1,
+            lives: 3,
+            fallingBlocks: [],
+            baskets: [],
+            speed: 1,
+            spawnTimer: 0,
+            spawnInterval: 120
+        };
+
+        // Basket class
+        class Basket {
+            constructor(category, x) {
+                this.category = category;
+                this.x = x;
+                this.y = canvas.height - 80;
+                this.width = canvas.width / 4 - 10;
+                this.height = 60;
+                this.color = categoryColors[category];
+            }
+            
+            updatePosition() {
+                this.y = canvas.height - 80;
+                this.width = canvas.width / 4 - 10;
+            }
+
+            draw() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = this.color;
+                ctx.font = 'bold 12px Courier New';
+                ctx.textAlign = 'center';
+                const text = this.category.toUpperCase();
+                ctx.fillText(text, this.x + this.width / 2, this.y + this.height / 2 + 4);
+            }
+
+            contains(block) {
+                return block.x > this.x && 
+                       block.x < this.x + this.width &&
+                       block.y + block.size > this.y;
+            }
+        }
+
+        // Falling Block class
+        class FallingBlock {
+            constructor() {
+                this.category = categories[Math.floor(Math.random() * categories.length)];
+                this.code = codeBlocks[this.category][Math.floor(Math.random() * codeBlocks[this.category].length)];
+                this.x = Math.random() * (canvas.width - 60) + 30;
+                this.y = -50;
+                this.size = 50;
+                this.speed = 2 * gameState.speed;
+                this.color = categoryColors[this.category];
+                this.caught = false;
+            }
+
+            update() {
+                this.y += this.speed;
+            }
+
+            draw() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(this.x - this.size/2 + 2, this.y - this.size/2 + 2, this.size, this.size);
+                ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                ctx.fillStyle = this.color;
+                ctx.font = 'bold 18px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.code, this.x, this.y);
+            }
+
+            isOffScreen() {
+                return this.y > canvas.height + 50;
+            }
+        }
+
+        // Initialize baskets
+        function initBaskets() {
+            gameState.baskets = [];
+            categories.forEach((category, index) => {
+                const x = index * (canvas.width / 4) + 5;
+                gameState.baskets.push(new Basket(category, x));
+            });
+        }
+
+        // Start game
+        function startGame() {
+            console.log('🚀 Starting game...');
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            
+            gameState.running = true;
+            gameState.score = 0;
+            gameState.level = 1;
+            gameState.lives = 3;
+            gameState.speed = 1;
+            gameState.fallingBlocks = [];
+            gameState.spawnTimer = 0;
+            
+            resizeCanvas();
+            initBaskets();
+            updateHUD();
+            gameLoop();
+        }
+
+        // Restart game
+        function restartGame() {
+            document.getElementById('gameOver').classList.add('hidden');
+            startGame();
+        }
+
+        // Show start screen
+        function showStartScreen() {
+            document.getElementById('gameOver').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            gameState.running = false;
+        }
+
+        // Update HUD
+        function updateHUD() {
+            document.getElementById('scoreDisplay').textContent = gameState.score;
+            document.getElementById('levelDisplay').textContent = gameState.level;
+            document.getElementById('livesDisplay').textContent = gameState.lives;
+        }
+
+        // Spawn falling block
+        function spawnBlock() {
+            gameState.fallingBlocks.push(new FallingBlock());
+        }
+
+        // Check collisions
+        function checkCollisions() {
+            gameState.fallingBlocks.forEach((block, blockIndex) => {
+                if (block.caught) return;
+
+                gameState.baskets.forEach(basket => {
+                    if (basket.contains(block)) {
+                        block.caught = true;
+                        
+                        if (basket.category === block.category) {
+                            gameState.score += 10;
+                            showFeedback(basket.x + basket.width/2, basket.y, '+10', '#00ff88');
+                        } else {
+                            gameState.lives--;
+                            showFeedback(basket.x + basket.width/2, basket.y, 'WRONG', '#ff0088');
+                            if (gameState.lives <= 0) {
+                                endGame();
+                            }
+                        }
+                        
+                        gameState.fallingBlocks.splice(blockIndex, 1);
+                        updateHUD();
+                    }
+                });
+
+                if (block.isOffScreen() && !block.caught) {
+                    gameState.lives--;
+                    gameState.fallingBlocks.splice(blockIndex, 1);
+                    updateHUD();
+                    if (gameState.lives <= 0) {
+                        endGame();
+                    }
+                }
+            });
+        }
+
+        // Feedback particles
+        const feedbackParticles = [];
+        function showFeedback(x, y, text, color) {
+            feedbackParticles.push({ x, y, text, color, alpha: 1, life: 60 });
+        }
+
+        function updateFeedback() {
+            feedbackParticles.forEach((particle, index) => {
+                particle.y -= 2;
+                particle.alpha -= 0.02;
+                particle.life--;
+
+                ctx.save();
+                ctx.globalAlpha = particle.alpha;
+                ctx.fillStyle = particle.color;
+                ctx.font = 'bold 24px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(particle.text, particle.x, particle.y);
+                ctx.restore();
+
+                if (particle.life <= 0) {
+                    feedbackParticles.splice(index, 1);
+                }
+            });
+        }
+
+        // Level up
+        function checkLevelUp() {
+            const newLevel = Math.floor(gameState.score / 50) + 1;
+            if (newLevel > gameState.level) {
+                gameState.level = newLevel;
+                gameState.speed = 1 + (gameState.level - 1) * 0.3;
+                gameState.spawnInterval = Math.max(60, 120 - (gameState.level - 1) * 10);
+                updateHUD();
+            }
+        }
+
+        // End game
+        function endGame() {
+            gameState.running = false;
+            document.getElementById('finalScore').textContent = 'Score: ' + gameState.score;
+            document.getElementById('gameOver').classList.remove('hidden');
+        }
+
+        // Main game loop
+        function gameLoop() {
+            if (!gameState.running) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            gameState.spawnTimer++;
+            if (gameState.spawnTimer >= gameState.spawnInterval) {
+                spawnBlock();
+                gameState.spawnTimer = 0;
+            }
+
+            gameState.fallingBlocks.forEach(block => {
+                block.update();
+                block.draw();
+            });
+
+            gameState.baskets.forEach(basket => {
+                basket.updatePosition();
+                basket.draw();
+            });
+
+            checkCollisions();
+            updateFeedback();
+            checkLevelUp();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Button event listeners
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+        document.getElementById('menuBtn').addEventListener('click', showStartScreen);
+
+        // Touch controls for gameplay
+        canvas.addEventListener('touchstart', handleTouch);
+        canvas.addEventListener('click', handleTouch);
+
+        function handleTouch(e) {
+            if (!gameState.running) return;
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches ? e.touches[0].clientX : e.clientX;
+            const clickX = x - rect.left;
+            
+            // Move baskets left or right
+            const basketShift = canvas.width / 8;
+            if (clickX < canvas.width / 2) {
+                // Shift all baskets left
+                gameState.baskets.forEach((basket, i) => {
+                    const newX = i * (canvas.width / 4) - basketShift + 5;
+                    if (newX >= 0) {
+                        basket.x = newX;
+                    }
+                });
+            } else {
+                // Shift all baskets right
+                gameState.baskets.forEach((basket, i) => {
+                    const newX = i * (canvas.width / 4) + basketShift + 5;
+                    if (newX + basket.width <= canvas.width) {
+                        basket.x = newX;
+                    }
+                });
+            }
+        }
+
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('✅ Service Worker registered'))
+                .catch(err => console.log('⚠️ SW registration failed:', err));
+        }
+
+        console.log('✅ Code Runner loaded successfully!');
+        console.log('👉 Tap START GAME to play!');
+    </script>
+</body>
+</html>
